@@ -40,3 +40,4 @@ docker run -ti -v /my/path/for-webroot:/webroot-dir ket4yii/letsencrypt-to-vault
 ## Kubernetes
 
 Sample CronJob is in .kube directory. If you want to use it, just change `args` and `volumes` section in configuration if you need. Default schedule is to run the script once in a three months.
+# podman-cfg
