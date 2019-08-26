@@ -8,12 +8,21 @@ echoerr() {
 process_args() {
     # Default
     if [[ -z $VAULT_CERT_PATH ]]; then
-        VAULT_CERT_PATH="certs"
+        VAULT_CERT_PATH="fabio/data/certs/"
+    fi
+
+    if [[ -z $VAULT_TOKEN ]]; then
+	    [[ ! -f /vault/config/vault_token ]] && /wrench/cmd/get-vault-token
+
+	    VAULT_TOKEN=$(cat /vault/config/vault_token)
     fi
 
     if [[ -z $CERTBOT_FLAGS ]]; then
-        CERTBOT_FLAGS="--webroot --webroot-path /webroot-dir --agree-tos --renew-by-default"
+        CERTBOT_FLAGS="--standalone --agree-tos --rsa-key-size 4096 --test-cert  --preferred-challenges http-01 --http-01-port 8000 -m $EMAIL --non-interactive"
+	
     fi
+    echo $CERTBOT_FLAGS
+
 
     while [[ $# -gt 0 ]]
     do
@@ -71,7 +80,7 @@ process_args() {
 }
 
 show_help() {
-    echo "Let's encrypt to Hashicorp Vault"
+    echo "Let's encrypt to Hashicorp Vault to be used with fabio"
     echo
     echo "Renew or get Let's Encrypt certificates and send it to Hashicorp Vault"
     echo
@@ -108,14 +117,16 @@ send_to_vault() {
     echo "Sending certs to vault..."
     echo
 
-    if [[ $COMMAND == "certonly" ]]; then
-        local sitesnames="$DOMAINS"
-    else
+#    if [[ $COMMAND == "certonly" ]]; then
+#        local sitesnames="$DOMAINS"
+#    else
         local sitesnames=$(find $certs_dir -maxdepth 1 -mindepth 1 -type d -exec basename {} \;)
-    fi
+#    fi
 
     for sitename in $sitesnames
     do
+	echo "==> Uploading $sitename to $VAULT_ADDR/v1/$VAULT_CERT_PATH/$sitename"
+
         local cert=$(sed -e ':a' -e 'N' -e '$!ba' -e 's/\n/\\n/g' $certs_dir/$sitename/fullchain.pem)
         local privkey=$(sed -e ':a' -e 'N' -e '$!ba' -e 's/\n/\\n/g' $certs_dir/$sitename/privkey.pem)
 
@@ -130,7 +141,7 @@ send_to_vault() {
             -H "X-Vault-Token: $VAULT_TOKEN" \
             -H "Content-Type: application/json" \
             -X POST \
-            -d "{\"key\":\"$privkey\", \"cert\": \"$cert\"}" \
+            -d "{\"data\": { \"key\":\"$privkey\", \"cert\": \"$cert\" }}" \
             "$VAULT_ADDR/v1/$VAULT_CERT_PATH/$sitename"
     done
 
@@ -144,3 +155,4 @@ main() {
 }
 
 main "$@"
+sleep 40000
